@@ -14,34 +14,44 @@ const { sendOTPEmail } = require('./mailer');
 // --- OTP GENERATION & EMAIL ENDPOINT ---
 // POST /api/send-otp { email }
 app.post('/api/send-otp', async (req, res) => {
-	const { email } = req.body;
+	const { email, type } = req.body; // type: 'user' or 'admin' (optional, default to user)
 	if (!email) return res.status(400).json({ error: 'Email required' });
-	// Check if user or admin exists
-	db.query(
-		'SELECT id FROM users WHERE email = ? UNION SELECT id FROM admins WHERE email = ?',
-		[email, email],
-		async (err, results) => {
-			if (err) return res.status(500).json({ error: 'DB error' });
-			if (results.length === 0) return res.status(404).json({ error: 'Email not found' });
-			// Generate 6-digit OTP
-			const otp = ('' + Math.floor(100000 + Math.random() * 900000));
-			const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 min
-			// Store OTP in DB
-			db.query(
-				'INSERT INTO otps (email, otp_code, expires_at) VALUES (?, ?, ?)',
-				[email, otp, expiresAt],
-				async (err2) => {
-					if (err2) return res.status(500).json({ error: 'DB error (otp)' });
-					try {
-						await sendOTPEmail(email, otp);
-						res.json({ message: 'OTP sent' });
-					} catch (e) {
-						res.status(500).json({ error: 'Failed to send email' });
-					}
-				}
-			);
+
+	const accountType = type === 'admin' ? 'admin' : 'user';
+
+	try {
+		// ensure account exists for given email
+		const table = accountType === 'admin' ? 'admins' : 'users';
+		const exists = await new Promise((resolve, reject) => {
+			db.query(`SELECT id FROM ${table} WHERE email = ? LIMIT 1`, [email], (err, results) => {
+				if (err) return reject(err);
+				resolve(results && results.length > 0);
+			});
+		});
+		if (!exists) return res.status(404).json({ error: `${accountType} account not found` });
+
+		// generate 6-digit numeric OTP
+		const otp = Math.floor(100000 + Math.random() * 900000).toString();
+		// expires in 5 minutes
+		const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+		// store OTP in DB
+		await new Promise((resolve, reject) => {
+			const sql = 'INSERT INTO otps (email, otp_code, expires_at) VALUES (?, ?, ?)';
+			db.query(sql, [email, otp, expiresAt], (err, result) => err ? reject(err) : resolve(result));
+		});
+
+		// send via mailer
+		await require('./mailer').sendOTPEmail(email, otp);
+
+		return res.json({ ok: true, message: 'OTP sent' });
+	} catch (err) {
+		console.error('send-otp failed:', err && err.message ? err.message : err);
+		if (err.code === 'INVALID_GMAIL_REFRESH') {
+			return res.status(500).json({ error: 'Email provider refresh token invalid; please reconfigure.' });
 		}
-	);
+		return res.status(500).json({ error: 'Failed to send OTP' });
+	}
 });
 
 // POST /api/verify-otp { email, otp }
@@ -59,6 +69,43 @@ app.post('/api/verify-otp', (req, res) => {
 			res.json({ message: 'OTP verified' });
 		}
 	);
+});
+
+// POST /api/reset-password { email, newPassword, type }
+app.post('/api/reset-password', async (req, res) => {
+	const { email, newPassword, type } = req.body;
+	if (!email || !newPassword) return res.status(400).json({ error: 'Email and newPassword required' });
+	const accountType = type === 'admin' ? 'admin' : 'user';
+
+	try {
+		// Check that a recently-verified OTP exists for this email (used=1 within 15 minutes)
+		const verified = await new Promise((resolve, reject) => {
+			db.query(
+				'SELECT id FROM otps WHERE email = ? AND used = 1 AND created_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE) ORDER BY created_at DESC LIMIT 1',
+				[email],
+				(err, results) => {
+					if (err) return reject(err);
+					resolve(results && results.length > 0);
+				}
+			);
+		});
+		if (!verified) return res.status(403).json({ error: 'OTP not verified or expired' });
+
+		const hashed = await bcrypt.hash(newPassword, 10);
+		const table = accountType === 'admin' ? 'admins' : 'users';
+		const updateResult = await new Promise((resolve, reject) => {
+			db.query(`UPDATE ${table} SET password = ? WHERE email = ?`, [hashed, email], (err, result) => {
+				if (err) return reject(err);
+				resolve(result);
+			});
+		});
+		if (updateResult.affectedRows === 0) return res.status(404).json({ error: `${accountType} account not found` });
+
+		return res.json({ message: 'Password updated' });
+	} catch (err) {
+		console.error('reset-password failed:', err && err.message ? err.message : err);
+		return res.status(500).json({ error: 'Failed to reset password' });
+	}
 });
 
 
@@ -663,4 +710,25 @@ app.get('/api/admin/reflections/responses', (req, res) => {
 			res.json(results);
 		}
 	);
+});
+
+// POST /api/check-account { email, type }
+// Returns { exists: true } if an account for that email exists in users or admins.
+app.post('/api/check-account', async (req, res) => {
+	const { email, type } = req.body;
+	if (!email) return res.status(400).json({ error: 'Email required' });
+	const accountType = type === 'admin' ? 'admin' : 'user';
+	const table = accountType === 'admin' ? 'admins' : 'users';
+	try {
+		const exists = await new Promise((resolve, reject) => {
+			db.query(`SELECT id FROM ${table} WHERE email = ? LIMIT 1`, [email], (err, results) => {
+				if (err) return reject(err);
+				resolve(results && results.length > 0);
+			});
+		});
+		return res.json({ exists });
+	} catch (err) {
+		console.error('check-account failed:', err && err.message ? err.message : err);
+		return res.status(500).json({ error: 'Database error' });
+	}
 });
