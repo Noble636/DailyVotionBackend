@@ -732,3 +732,121 @@ app.post('/api/check-account', async (req, res) => {
 		return res.status(500).json({ error: 'Database error' });
 	}
 });
+
+// --- Tenant-portal style convenience endpoints ---
+// User: verify email (sends OTP) -> POST /api/user/forgot-password/verify-email { email }
+app.post('/api/user/forgot-password/verify-email', async (req, res) => {
+	const { email } = req.body;
+	if (!email) return res.status(400).json({ error: 'Email required' });
+	try {
+		// Ensure user exists
+		const userRows = await new Promise((resolve, reject) => {
+			db.query('SELECT id, fullName, username, email FROM users WHERE email = ? LIMIT 1', [email], (err, results) => err ? reject(err) : resolve(results));
+		});
+		if (!userRows || userRows.length === 0) return res.status(404).json({ error: 'User not found' });
+
+		// generate and store OTP
+		const otp = Math.floor(100000 + Math.random() * 900000).toString();
+		const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+		await new Promise((resolve, reject) => {
+			db.query('INSERT INTO otps (email, otp_code, expires_at) VALUES (?, ?, ?)', [email, otp, expiresAt], (err, r) => err ? reject(err) : resolve(r));
+		});
+		// send
+		await require('./mailer').sendOTPEmail(email, otp);
+		return res.json({ message: 'OTP sent', userDetails: userRows[0] });
+	} catch (err) {
+		console.error('user/forgot-password/verify-email failed:', err && err.message ? err.message : err);
+		return res.status(500).json({ error: 'Failed to send OTP' });
+	}
+});
+
+// User: verify OTP -> POST /api/user/forgot-password/verify-otp { email, otp }
+app.post('/api/user/forgot-password/verify-otp', (req, res) => {
+	const { email, otp } = req.body;
+	if (!email || !otp) return res.status(400).json({ error: 'Email and OTP required' });
+	db.query('SELECT * FROM otps WHERE email = ? AND otp_code = ? AND used = 0 AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1', [email, otp], (err, results) => {
+		if (err) return res.status(500).json({ error: 'DB error' });
+		if (!results || results.length === 0) return res.status(400).json({ error: 'Invalid or expired OTP' });
+		db.query('UPDATE otps SET used = 1 WHERE id = ?', [results[0].id]);
+		// optionally return a short-lived token or confirmation
+		return res.json({ message: 'OTP verified' });
+	});
+});
+
+// User: reset password -> POST /api/user/forgot-password/reset-password { email, newPassword }
+app.post('/api/user/forgot-password/reset-password', async (req, res) => {
+	const { email, newPassword } = req.body;
+	if (!email || !newPassword) return res.status(400).json({ error: 'Email and newPassword required' });
+	try {
+		// require recently used OTP (used=1 within 15 minutes)
+		const verified = await new Promise((resolve, reject) => {
+			db.query('SELECT id FROM otps WHERE email = ? AND used = 1 AND created_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE) ORDER BY created_at DESC LIMIT 1', [email], (err, results) => err ? reject(err) : resolve(results && results.length > 0));
+		});
+		if (!verified) return res.status(403).json({ error: 'OTP not verified or expired' });
+		const hashed = await bcrypt.hash(newPassword, 10);
+		const result = await new Promise((resolve, reject) => {
+			db.query('UPDATE users SET password = ? WHERE email = ?', [hashed, email], (err, r) => err ? reject(err) : resolve(r));
+		});
+		if (result.affectedRows === 0) return res.status(404).json({ error: 'User not found' });
+		return res.json({ message: 'Password updated' });
+	} catch (err) {
+		console.error('user reset-password failed:', err && err.message ? err.message : err);
+		return res.status(500).json({ error: 'Failed to reset password' });
+	}
+});
+
+// --- Admin convenience endpoints (follow tenantportal pattern) ---
+// Admin: verify email (send OTP)
+app.post('/api/admin/forgot-password/verify-email', async (req, res) => {
+	const { email } = req.body;
+	if (!email) return res.status(400).json({ error: 'Email required' });
+	try {
+		const adminRows = await new Promise((resolve, reject) => {
+			db.query('SELECT id, fullName, username, email FROM admins WHERE email = ? LIMIT 1', [email], (err, results) => err ? reject(err) : resolve(results));
+		});
+		if (!adminRows || adminRows.length === 0) return res.status(404).json({ error: 'Admin not found' });
+		const otp = Math.floor(100000 + Math.random() * 900000).toString();
+		const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+		await new Promise((resolve, reject) => {
+			db.query('INSERT INTO otps (email, otp_code, expires_at) VALUES (?, ?, ?)', [email, otp, expiresAt], (err, r) => err ? reject(err) : resolve(r));
+		});
+		await require('./mailer').sendOTPEmail(email, otp);
+		return res.json({ message: 'OTP sent', adminDetails: adminRows[0] });
+	} catch (err) {
+		console.error('admin/forgot-password/verify-email failed:', err && err.message ? err.message : err);
+		return res.status(500).json({ error: 'Failed to send OTP' });
+	}
+});
+
+// Admin verify OTP
+app.post('/api/admin/forgot-password/verify-otp', (req, res) => {
+	const { email, otp } = req.body;
+	if (!email || !otp) return res.status(400).json({ error: 'Email and OTP required' });
+	db.query('SELECT * FROM otps WHERE email = ? AND otp_code = ? AND used = 0 AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1', [email, otp], (err, results) => {
+		if (err) return res.status(500).json({ error: 'DB error' });
+		if (!results || results.length === 0) return res.status(400).json({ error: 'Invalid or expired OTP' });
+		db.query('UPDATE otps SET used = 1 WHERE id = ?', [results[0].id]);
+		return res.json({ message: 'OTP verified' });
+	});
+});
+
+// Admin reset password
+app.post('/api/admin/forgot-password/reset-password', async (req, res) => {
+	const { email, newPassword } = req.body;
+	if (!email || !newPassword) return res.status(400).json({ error: 'Email and newPassword required' });
+	try {
+		const verified = await new Promise((resolve, reject) => {
+			db.query('SELECT id FROM otps WHERE email = ? AND used = 1 AND created_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE) ORDER BY created_at DESC LIMIT 1', [email], (err, results) => err ? reject(err) : resolve(results && results.length > 0));
+		});
+		if (!verified) return res.status(403).json({ error: 'OTP not verified or expired' });
+		const hashed = await bcrypt.hash(newPassword, 10);
+		const result = await new Promise((resolve, reject) => {
+			db.query('UPDATE admins SET password = ? WHERE email = ?', [hashed, email], (err, r) => err ? reject(err) : resolve(r));
+		});
+		if (result.affectedRows === 0) return res.status(404).json({ error: 'Admin not found' });
+		return res.json({ message: 'Password updated' });
+	} catch (err) {
+		console.error('admin reset-password failed:', err && err.message ? err.message : err);
+		return res.status(500).json({ error: 'Failed to reset password' });
+	}
+});
