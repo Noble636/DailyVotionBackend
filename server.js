@@ -66,8 +66,6 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// ...existing code...
-
 // Admin login endpoint (moved after app initialization)
 app.post('/api/admin/login', (req, res) => {
 	const { emailOrUsername, password } = req.body;
@@ -160,20 +158,88 @@ app.put('/api/user/:id', upload.single('profilePic'), async (req, res) => {
 });
 
 // MySQL connection
-const db = mysql.createConnection({
-	host: process.env.DB_HOST,
-	user: process.env.DB_USER,
-	password: process.env.DB_PASS,
-	database: process.env.DB_NAME,
-	port: process.env.DB_PORT
-});
+// Add small connect timeout and parse port to give clearer ETIMEDOUT errors quickly
+// MySQL connection with SSL support and retry logic
+// Build connection options from env vars
+const buildConnectionOptions = () => {
+	const options = {
+		host: process.env.DB_HOST,
+		user: process.env.DB_USER,
+		password: process.env.DB_PASS,
+		database: process.env.DB_NAME,
+		port: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : undefined,
+		connectTimeout: process.env.DB_CONNECT_TIMEOUT ? parseInt(process.env.DB_CONNECT_TIMEOUT, 10) : 10000,
+	};
 
-db.connect((err) => {
-	if (err) throw err;
-	console.log('Connected to MySQL database');
-});
+	// SSL support (use DB_SSL=true to enable)
+	const sslEnabled = process.env.DB_SSL === 'true';
+	if (sslEnabled) {
+		// If a base64-encoded CA is provided, use it
+		if (process.env.DB_SSL_CA_B64) {
+			try {
+				options.ssl = {
+					ca: Buffer.from(process.env.DB_SSL_CA_B64, 'base64'),
+					rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false'
+				};
+			} catch (e) {
+				console.error('Failed to decode DB_SSL_CA_B64; proceeding without CA:', e.message);
+				options.ssl = { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' };
+			}
+		} else {
+			// Enable TLS without explicit CA (may work if cert is trusted)
+			options.ssl = { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' };
+		}
+	}
 
-// Registration endpoint
+	return options;
+};
+
+const MAX_RETRIES = process.env.DB_CONNECT_RETRIES ? parseInt(process.env.DB_CONNECT_RETRIES, 10) : 5;
+const RETRY_BASE_DELAY = process.env.DB_RETRY_DELAY ? parseInt(process.env.DB_RETRY_DELAY, 10) : 2000;
+
+let db; // will hold the active connection
+
+const createDbConnection = () => mysql.createConnection(buildConnectionOptions());
+
+const connectWithRetry = async () => {
+	for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+		db = createDbConnection();
+		try {
+			await new Promise((resolve, reject) => {
+				db.connect((err) => {
+					if (err) return reject(err);
+					resolve();
+				});
+			});
+			console.log('Connected to MySQL database');
+			return;
+		} catch (err) {
+			// Provide concise but helpful logs
+			console.error(`MySQL connection attempt ${attempt} failed: ${err && err.code ? err.code : err.message || err}`);
+			if (attempt < MAX_RETRIES) {
+				const delay = RETRY_BASE_DELAY * attempt;
+				console.log(`Retrying MySQL connection in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
+				await new Promise((r) => setTimeout(r, delay));
+			} else {
+				console.error('All MySQL connection attempts failed. Troubleshooting tips:');
+				console.error('- Verify DB_HOST, DB_USER, DB_PASS, DB_NAME, DB_PORT are set as environment variables');
+				console.error('- If using a managed DB (Aiven/etc.), ensure TLS settings are correct and the CA (DB_SSL_CA_B64) is provided');
+				console.error('- Ensure the database allows connections from this host; check allowlists and network settings');
+				console.error('Last error:', err && err.code ? `${err.code} - ${err.message}` : err);
+				process.exit(1);
+			}
+		}
+	}
+};
+
+// Start connection attempts
+connectWithRetry();
+
+
+// Export `db` via module if other modules require it later in this file
+// Some existing code expects `db` to be available synchronously; this file assumes asynchronous startup.
+
+// Registration endpoint (was moved here to ensure DB connection setup first)
 app.post('/api/register', async (req, res) => {
 	const { fullName, username, email, mobile, password } = req.body;
 	if (!fullName || !username || !email || !password) {
