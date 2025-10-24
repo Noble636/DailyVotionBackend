@@ -9,6 +9,57 @@ const path = require('path');
 const fs = require('fs');
 const app = express();
 const PORT = 5000;
+const crypto = require('crypto');
+const { sendOTPEmail } = require('./mailer');
+// --- OTP GENERATION & EMAIL ENDPOINT ---
+// POST /api/send-otp { email }
+app.post('/api/send-otp', async (req, res) => {
+	const { email } = req.body;
+	if (!email) return res.status(400).json({ error: 'Email required' });
+	// Check if user or admin exists
+	db.query(
+		'SELECT id FROM users WHERE email = ? UNION SELECT id FROM admins WHERE email = ?',
+		[email, email],
+		async (err, results) => {
+			if (err) return res.status(500).json({ error: 'DB error' });
+			if (results.length === 0) return res.status(404).json({ error: 'Email not found' });
+			// Generate 6-digit OTP
+			const otp = ('' + Math.floor(100000 + Math.random() * 900000));
+			const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 min
+			// Store OTP in DB
+			db.query(
+				'INSERT INTO otps (email, otp_code, expires_at) VALUES (?, ?, ?)',
+				[email, otp, expiresAt],
+				async (err2) => {
+					if (err2) return res.status(500).json({ error: 'DB error (otp)' });
+					try {
+						await sendOTPEmail(email, otp);
+						res.json({ message: 'OTP sent' });
+					} catch (e) {
+						res.status(500).json({ error: 'Failed to send email' });
+					}
+				}
+			);
+		}
+	);
+});
+
+// POST /api/verify-otp { email, otp }
+app.post('/api/verify-otp', (req, res) => {
+	const { email, otp } = req.body;
+	if (!email || !otp) return res.status(400).json({ error: 'Email and OTP required' });
+	db.query(
+		'SELECT * FROM otps WHERE email = ? AND otp_code = ? AND used = 0 AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1',
+		[email, otp],
+		(err, results) => {
+			if (err) return res.status(500).json({ error: 'DB error' });
+			if (results.length === 0) return res.status(400).json({ error: 'Invalid or expired OTP' });
+			// Mark OTP as used
+			db.query('UPDATE otps SET used = 1 WHERE id = ?', [results[0].id]);
+			res.json({ message: 'OTP verified' });
+		}
+	);
+});
 
 
 app.use(cors());
