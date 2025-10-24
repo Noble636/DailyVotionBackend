@@ -42,40 +42,4 @@ async function sendOTPEmail(to, otp) {
   }
 }
 
-module.exports = { sendOTPEmail };// dailyvotionbackend/mailer.js
-const nodemailer = require('nodemailer');
-const { google } = require('googleapis');
-
-oAuth2Client.setCredentials({ refresh_token: REFRESH_TOKEN });
-
-async function sendOTPEmail(to, otp) {
-  try {
-    const accessToken = await oAuth2Client.getAccessToken();
-    const transport = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        type: 'OAuth2',
-        user: process.env.GMAIL_SENDER, // your gmail address
-        clientId: CLIENT_ID,
-        clientSecret: CLIENT_SECRET,
-        refreshToken: REFRESH_TOKEN,
-        accessToken: accessToken.token,
-      },
-    });
-
-    const mailOptions = {
-      from: `DailyVotion <${process.env.GMAIL_SENDER}>`,
-      to,
-      subject: 'Your DailyVotion OTP Code',
-      text: `Your OTP code is: ${otp}\nThis code will expire in 5 minutes.`,
-    };
-
-    const result = await transport.sendMail(mailOptions);
-    return result;
-  } catch (error) {
-    console.error('Error sending OTP email:', error);
-    throw error;
-  }
-}
-
 module.exports = { sendOTPEmail };
