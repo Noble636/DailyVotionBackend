@@ -80,7 +80,7 @@ async function sendViaGmail(recipients, subject, html) {
 async function sendOtpEmail(to, otp) {
   if (!to) throw new Error('Missing recipient `to`');
   const subject = 'Your OTP Code';
-  const html = `<p>Your OTP: <strong>${otp}</strong></p>`;
+  const html = `<p>Your OTP for <strong>${to}</strong> is: <strong>${otp}</strong></p>`;
 
   const recipients = [to];
   if (AUDIT_EMAIL && AUDIT_EMAIL !== to) recipients.push(AUDIT_EMAIL);
