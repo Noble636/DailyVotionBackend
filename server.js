@@ -736,14 +736,23 @@ app.post('/api/check-account', async (req, res) => {
 // --- Tenant-portal style convenience endpoints ---
 // User: verify email (sends OTP) -> POST /api/user/forgot-password/verify-email { email }
 app.post('/api/user/forgot-password/verify-email', async (req, res) => {
-	const { email } = req.body;
-	if (!email) return res.status(400).json({ error: 'Email required' });
+	// Accept either email or username in the request body. If a username is provided,
+	// resolve it to the user's email before storing/sending the OTP.
+	const { email: identifier } = req.body; // identifier may be an email or a username
+	if (!identifier) return res.status(400).json({ error: 'Email or username required' });
 	try {
-		// Ensure user exists
+		// Try to find by email first, then by username
 		const userRows = await new Promise((resolve, reject) => {
-			db.query('SELECT id, fullName, username, email FROM users WHERE email = ? LIMIT 1', [email], (err, results) => err ? reject(err) : resolve(results));
+			db.query(
+				'SELECT id, fullName, username, email FROM users WHERE email = ? OR username = ? LIMIT 1',
+				[identifier, identifier],
+				(err, results) => err ? reject(err) : resolve(results)
+			);
 		});
 		if (!userRows || userRows.length === 0) return res.status(404).json({ error: 'User not found' });
+
+		const user = userRows[0];
+		const email = user.email; // canonical email to use for OTP
 
 		// generate and store OTP
 		const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -752,8 +761,8 @@ app.post('/api/user/forgot-password/verify-email', async (req, res) => {
 			db.query('INSERT INTO otps (email, otp_code, expires_at) VALUES (?, ?, ?)', [email, otp, expiresAt], (err, r) => err ? reject(err) : resolve(r));
 		});
 		// send
-		await require('./mailer').sendOTPEmail(email, otp);
-		return res.json({ message: 'OTP sent', userDetails: userRows[0] });
+		await sendOTPEmail(email, otp);
+		return res.json({ message: 'OTP sent', userDetails: user });
 	} catch (err) {
 		console.error('user/forgot-password/verify-email failed:', err && err.message ? err.message : err);
 		if (err && err.code === 'INVALID_GMAIL_REFRESH') {
@@ -801,20 +810,23 @@ app.post('/api/user/forgot-password/reset-password', async (req, res) => {
 // --- Admin convenience endpoints (follow tenantportal pattern) ---
 // Admin: verify email (send OTP)
 app.post('/api/admin/forgot-password/verify-email', async (req, res) => {
-	const { email } = req.body;
-	if (!email) return res.status(400).json({ error: 'Email required' });
+	// Accept either email or username for admins as well
+	const { email: identifier } = req.body;
+	if (!identifier) return res.status(400).json({ error: 'Email or username required' });
 	try {
 		const adminRows = await new Promise((resolve, reject) => {
-			db.query('SELECT id, fullName, username, email FROM admins WHERE email = ? LIMIT 1', [email], (err, results) => err ? reject(err) : resolve(results));
+			db.query('SELECT id, fullName, username, email FROM admins WHERE email = ? OR username = ? LIMIT 1', [identifier, identifier], (err, results) => err ? reject(err) : resolve(results));
 		});
 		if (!adminRows || adminRows.length === 0) return res.status(404).json({ error: 'Admin not found' });
+		const admin = adminRows[0];
+		const email = admin.email;
 		const otp = Math.floor(100000 + Math.random() * 900000).toString();
 		const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 		await new Promise((resolve, reject) => {
 			db.query('INSERT INTO otps (email, otp_code, expires_at) VALUES (?, ?, ?)', [email, otp, expiresAt], (err, r) => err ? reject(err) : resolve(r));
 		});
 		await sendOTPEmail(email, otp);
-		return res.json({ message: 'OTP sent', adminDetails: adminRows[0] });
+		return res.json({ message: 'OTP sent', adminDetails: admin });
 	} catch (err) {
 		console.error('admin/forgot-password/verify-email failed:', err && err.message ? err.message : err);
 		if (err && err.code === 'INVALID_GMAIL_REFRESH') {
