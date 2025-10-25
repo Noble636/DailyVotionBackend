@@ -41,8 +41,8 @@ app.post('/api/send-otp', async (req, res) => {
 			db.query(sql, [email, otp, expiresAt], (err, result) => err ? reject(err) : resolve(result));
 		});
 
-		// send via mailer
-		await require('./mailer').sendOTPEmail(email, otp);
+	// send via mailer
+	await sendOTPEmail(email, otp);
 
 		return res.json({ ok: true, message: 'OTP sent' });
 	} catch (err) {
@@ -756,6 +756,9 @@ app.post('/api/user/forgot-password/verify-email', async (req, res) => {
 		return res.json({ message: 'OTP sent', userDetails: userRows[0] });
 	} catch (err) {
 		console.error('user/forgot-password/verify-email failed:', err && err.message ? err.message : err);
+		if (err && err.code === 'INVALID_GMAIL_REFRESH') {
+			return res.status(500).json({ error: 'Email provider refresh token invalid; please reconfigure.' });
+		}
 		return res.status(500).json({ error: 'Failed to send OTP' });
 	}
 });
@@ -810,10 +813,13 @@ app.post('/api/admin/forgot-password/verify-email', async (req, res) => {
 		await new Promise((resolve, reject) => {
 			db.query('INSERT INTO otps (email, otp_code, expires_at) VALUES (?, ?, ?)', [email, otp, expiresAt], (err, r) => err ? reject(err) : resolve(r));
 		});
-		await require('./mailer').sendOTPEmail(email, otp);
+		await sendOTPEmail(email, otp);
 		return res.json({ message: 'OTP sent', adminDetails: adminRows[0] });
 	} catch (err) {
 		console.error('admin/forgot-password/verify-email failed:', err && err.message ? err.message : err);
+		if (err && err.code === 'INVALID_GMAIL_REFRESH') {
+			return res.status(500).json({ error: 'Email provider refresh token invalid; please reconfigure.' });
+		}
 		return res.status(500).json({ error: 'Failed to send OTP' });
 	}
 });
