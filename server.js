@@ -11,16 +11,16 @@ const app = express();
 const PORT = 5000;
 const crypto = require('crypto');
 const { sendOTPEmail } = require('./mailer');
-// --- OTP GENERATION & EMAIL ENDPOINT ---
-// POST /api/send-otp { email }
+
+
 app.post('/api/send-otp', async (req, res) => {
-	const { email, type } = req.body; // type: 'user' or 'admin' (optional, default to user)
+	const { email, type } = req.body; 
 	if (!email) return res.status(400).json({ error: 'Email required' });
 
 	const accountType = type === 'admin' ? 'admin' : 'user';
 
 	try {
-		// ensure account exists for given email
+		
 		const table = accountType === 'admin' ? 'admins' : 'users';
 		const exists = await new Promise((resolve, reject) => {
 			db.query(`SELECT id FROM ${table} WHERE email = ? LIMIT 1`, [email], (err, results) => {
@@ -30,18 +30,18 @@ app.post('/api/send-otp', async (req, res) => {
 		});
 		if (!exists) return res.status(404).json({ error: `${accountType} account not found` });
 
-		// generate 6-digit numeric OTP
+		
 		const otp = Math.floor(100000 + Math.random() * 900000).toString();
-		// expires in 5 minutes
+		
 		const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
-		// store OTP in DB
+		
 		await new Promise((resolve, reject) => {
 			const sql = 'INSERT INTO otps (email, otp_code, expires_at) VALUES (?, ?, ?)';
 			db.query(sql, [email, otp, expiresAt], (err, result) => err ? reject(err) : resolve(result));
 		});
 
-	// send via mailer
+	
 	await sendOTPEmail(email, otp);
 
 		return res.json({ ok: true, message: 'OTP sent' });
@@ -54,7 +54,7 @@ app.post('/api/send-otp', async (req, res) => {
 	}
 });
 
-// POST /api/verify-otp { email, otp }
+
 app.post('/api/verify-otp', (req, res) => {
 	const { email, otp } = req.body;
 	if (!email || !otp) return res.status(400).json({ error: 'Email and OTP required' });
@@ -64,21 +64,21 @@ app.post('/api/verify-otp', (req, res) => {
 		(err, results) => {
 			if (err) return res.status(500).json({ error: 'DB error' });
 			if (results.length === 0) return res.status(400).json({ error: 'Invalid or expired OTP' });
-			// Mark OTP as used
+			
 			db.query('UPDATE otps SET used = 1 WHERE id = ?', [results[0].id]);
 			res.json({ message: 'OTP verified' });
 		}
 	);
 });
 
-// POST /api/reset-password { email, newPassword, type }
+
 app.post('/api/reset-password', async (req, res) => {
 	const { email, newPassword, type } = req.body;
 	if (!email || !newPassword) return res.status(400).json({ error: 'Email and newPassword required' });
 	const accountType = type === 'admin' ? 'admin' : 'user';
 
 	try {
-		// Check that a recently-verified OTP exists for this email (used=1 within 15 minutes)
+		
 		const verified = await new Promise((resolve, reject) => {
 			db.query(
 				'SELECT id FROM otps WHERE email = ? AND used = 1 AND created_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE) ORDER BY created_at DESC LIMIT 1',
@@ -113,7 +113,7 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Admin login endpoint (moved after app initialization)
+
 app.post('/api/admin/login', (req, res) => {
 	const { emailOrUsername, password } = req.body;
 	if (!emailOrUsername || !password) {
@@ -147,7 +147,7 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Multer setup for profile picture upload
+
 const storage = multer.diskStorage({
 	destination: function (req, file, cb) {
 		const uploadDir = path.join(__dirname, 'uploads');
@@ -159,7 +159,7 @@ const storage = multer.diskStorage({
 	}
 });
 const upload = multer({ storage });
-// Get user info
+
 app.get('/api/user/:id', (req, res) => {
 	const userId = req.params.id;
 	db.query('SELECT id, fullName, username, email, mobile, profilePic FROM users WHERE id = ?', [userId], (err, results) => {
@@ -169,7 +169,7 @@ app.get('/api/user/:id', (req, res) => {
 	});
 });
 
-// Update user info (with profile picture)
+
 app.put('/api/user/:id', upload.single('profilePic'), async (req, res) => {
 	const userId = req.params.id;
 	const { fullName, username, email, mobile, password } = req.body;
@@ -196,7 +196,7 @@ app.put('/api/user/:id', upload.single('profilePic'), async (req, res) => {
 				}
 				return res.status(500).json({ error: 'Database error' });
 			}
-			// Return updated profilePic path for immediate frontend refresh
+			
 			db.query('SELECT profilePic FROM users WHERE id = ?', [userId], (err2, rows) => {
 				if (err2) return res.status(500).json({ error: 'Database error' });
 				res.json({ message: 'Profile updated!', profilePic: rows[0]?.profilePic });
@@ -204,10 +204,10 @@ app.put('/api/user/:id', upload.single('profilePic'), async (req, res) => {
 		});
 });
 
-// MySQL connection
-// Add small connect timeout and parse port to give clearer ETIMEDOUT errors quickly
-// MySQL connection with SSL support and retry logic
-// Build connection options from env vars
+
+
+
+
 const buildConnectionOptions = () => {
 	const options = {
 		host: process.env.DB_HOST,
@@ -218,10 +218,10 @@ const buildConnectionOptions = () => {
 		connectTimeout: process.env.DB_CONNECT_TIMEOUT ? parseInt(process.env.DB_CONNECT_TIMEOUT, 10) : 10000,
 	};
 
-	// SSL support (use DB_SSL=true to enable)
+	
 	const sslEnabled = process.env.DB_SSL === 'true';
 	if (sslEnabled) {
-		// If a base64-encoded CA is provided, use it
+		
 		if (process.env.DB_SSL_CA_B64) {
 			try {
 				options.ssl = {
@@ -233,7 +233,7 @@ const buildConnectionOptions = () => {
 				options.ssl = { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' };
 			}
 		} else {
-			// Enable TLS without explicit CA (may work if cert is trusted)
+			
 			options.ssl = { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' };
 		}
 	}
@@ -244,7 +244,7 @@ const buildConnectionOptions = () => {
 const MAX_RETRIES = process.env.DB_CONNECT_RETRIES ? parseInt(process.env.DB_CONNECT_RETRIES, 10) : 5;
 const RETRY_BASE_DELAY = process.env.DB_RETRY_DELAY ? parseInt(process.env.DB_RETRY_DELAY, 10) : 2000;
 
-let db; // will hold the active connection
+let db; 
 
 const createDbConnection = () => mysql.createConnection(buildConnectionOptions());
 
@@ -261,7 +261,7 @@ const connectWithRetry = async () => {
 			console.log('Connected to MySQL database');
 			return;
 		} catch (err) {
-			// Provide concise but helpful logs
+			
 			console.error(`MySQL connection attempt ${attempt} failed: ${err && err.code ? err.code : err.message || err}`);
 			if (attempt < MAX_RETRIES) {
 				const delay = RETRY_BASE_DELAY * attempt;
@@ -279,14 +279,14 @@ const connectWithRetry = async () => {
 	}
 };
 
-// Start connection attempts
+
 connectWithRetry();
 
 
-// Export `db` via module if other modules require it later in this file
-// Some existing code expects `db` to be available synchronously; this file assumes asynchronous startup.
 
-// Registration endpoint (was moved here to ensure DB connection setup first)
+
+
+
 app.post('/api/register', async (req, res) => {
 	const { fullName, username, email, mobile, password } = req.body;
 	if (!fullName || !username || !email || !password) {
@@ -312,21 +312,21 @@ app.post('/api/register', async (req, res) => {
 	}
 });
 
-// Login endpoint
+
 app.post('/api/login', (req, res) => {
 	const { emailOrUsername, password } = req.body;
 	if (!emailOrUsername || !password) {
 		return res.status(400).json({ error: 'Missing credentials' });
 	}
-	// Only allow login for users in users table
-	// Debug logging
+	
+	
 	console.log('Login attempt:', emailOrUsername);
-	// Try to match username first
+	
 	db.query('SELECT * FROM users WHERE username = ?', [emailOrUsername], async (err, userResults) => {
 		if (err) return res.status(500).json({ error: 'Database error' });
 		console.log('Username match results:', userResults);
 		if (userResults.length === 0) {
-			// If not found, try email
+			
 			db.query('SELECT * FROM users WHERE email = ?', [emailOrUsername], async (err2, userResults2) => {
 				if (err2) return res.status(500).json({ error: 'Database error' });
 				console.log('Email match results:', userResults2);
@@ -366,7 +366,7 @@ app.post('/api/login', (req, res) => {
 });
 
 
-// Admin registration endpoint
+
 app.post('/api/admin/register', async (req, res) => {
 	const { fullName, username, email, mobile, password, adminCode } = req.body;
 	if (!fullName || !username || !email || !password || !adminCode) {
@@ -392,14 +392,14 @@ app.post('/api/admin/register', async (req, res) => {
 	}
 });
 
-// Admin code authentication endpoint
+
 app.post('/api/admin/auth', (req, res) => {
 	const { adminCode } = req.body;
 	if (!adminCode) {
 		return res.status(400).json({ error: 'Missing admin code' });
 	}
-	// Master code bypass
-	if (adminCode === 'DV-Admin') { // pwede palitan
+	
+	if (adminCode === 'DV-Admin') { 
 		return res.json({ success: true, message: 'Master code accepted' });
 	}
 	db.query(
@@ -418,7 +418,7 @@ app.post('/api/admin/auth', (req, res) => {
 app.listen(PORT, () => {
 		console.log(`Server running on port ${PORT}`);
 });
-// Get all users
+
 app.get('/api/admin/users', (req, res) => {
 	db.query('SELECT id, fullName, username, email, mobile, profilePic, created_at FROM users', [], (err, results) => {
 		if (err) return res.status(500).json({ error: 'Database error' });
@@ -426,7 +426,7 @@ app.get('/api/admin/users', (req, res) => {
 	});
 });
 
-// Get all admins
+
 app.get('/api/admin/admins', (req, res) => {
 	db.query('SELECT id, fullName, username, email, mobile, adminCode, allowUserLogin, created_at FROM admins', [], (err, results) => {
 		if (err) return res.status(500).json({ error: 'Database error' });
@@ -434,7 +434,7 @@ app.get('/api/admin/admins', (req, res) => {
 	});
 });
 
-// Delete user (cascade)
+
 app.delete('/api/admin/user/:id', (req, res) => {
 	const userId = req.params.id;
 	db.query('DELETE FROM users WHERE id = ?', [userId], (err, result) => {
@@ -443,7 +443,7 @@ app.delete('/api/admin/user/:id', (req, res) => {
 	});
 });
 
-// Delete admin (cascade)
+
 app.delete('/api/admin/admin/:id', (req, res) => {
 	const adminId = req.params.id;
 	db.query('DELETE FROM admins WHERE id = ?', [adminId], (err, result) => {
@@ -452,9 +452,9 @@ app.delete('/api/admin/admin/:id', (req, res) => {
 	});
 });
 
-// Edit user role (set as admin)
 
-// Edit admin code
+
+
 app.put('/api/admin/admin/:id/code', (req, res) => {
 	const adminId = req.params.id;
 	const { adminCode } = req.body;
@@ -465,10 +465,10 @@ app.put('/api/admin/admin/:id/code', (req, res) => {
 	});
 });
 
-// Toggle admin login method (allowUserLogin)
+
 app.put('/api/admin/admin/:id/loginmethod', (req, res) => {
 });
-// User: submit prayer request
+
 app.post('/api/user/:id/prayer', (req, res) => {
 	const userId = req.params.id;
 	const { text } = req.body;
@@ -487,7 +487,7 @@ app.post('/api/user/:id/prayer', (req, res) => {
 	);
 });
 
-// User: get own prayer requests
+
 app.get('/api/user/:id/prayer', (req, res) => {
 	const userId = req.params.id;
 	db.query(
@@ -500,7 +500,7 @@ app.get('/api/user/:id/prayer', (req, res) => {
 	);
 });
 
-// Admin: get all prayer requests
+
 app.get('/api/admin/prayer', (req, res) => {
 	db.query(
 		`SELECT p.id, p.user_id as userId, u.fullName as userName, p.text, p.date, p.status, p.response
@@ -514,7 +514,7 @@ app.get('/api/admin/prayer', (req, res) => {
 	);
 });
 
-// Admin: respond to prayer request
+
 app.post('/api/admin/prayer/:id/respond', (req, res) => {
 	const prayerId = req.params.id;
 	const { response } = req.body;
@@ -538,7 +538,7 @@ app.post('/api/admin/prayer/:id/respond', (req, res) => {
 		}
 	);
 });
-// User: submit app feedback
+
 app.post('/api/user/:id/feedback', (req, res) => {
 	const userId = req.params.id;
 	const { text } = req.body;
@@ -554,7 +554,7 @@ app.post('/api/user/:id/feedback', (req, res) => {
 	);
 });
 
-// Admin: get all feedback (hide user name)
+
 app.get('/api/admin/feedback', (req, res) => {
 	db.query(
 		'SELECT text, date FROM feedback ORDER BY date DESC, id DESC',
@@ -565,7 +565,7 @@ app.get('/api/admin/feedback', (req, res) => {
 		}
 	);
 });
-// Save journal entry for user
+
 app.post('/api/user/:id/journal', (req, res) => {
 	const userId = req.params.id;
 	const { date, scripture, observation, application, prayer } = req.body;
@@ -582,7 +582,7 @@ app.post('/api/user/:id/journal', (req, res) => {
 	);
 });
 
-// Get latest journal entry for user
+
 app.get('/api/user/:id/journal/latest', (req, res) => {
 	const userId = req.params.id;
 	db.query(
@@ -596,7 +596,7 @@ app.get('/api/user/:id/journal/latest', (req, res) => {
 	);
 });
 
-// Get all journal entries for user (for history)
+
 app.get('/api/user/:id/journal', (req, res) => {
 	const userId = req.params.id;
 	db.query(
@@ -609,13 +609,13 @@ app.get('/api/user/:id/journal', (req, res) => {
 	);
 });
 
-// Admin: deliver reflection activity to selected users
+
 app.post('/api/admin/reflection', (req, res) => {
 	const { adminId, message, userIds } = req.body;
 	if (!adminId || !message || !Array.isArray(userIds) || userIds.length === 0) {
 		return res.status(400).json({ error: 'Missing required fields' });
 	}
-	// Insert a reflection for each selected user
+	
 	const values = userIds.map(userId => [adminId, userId, message]);
 	db.beginTransaction(err => {
 		if (err) {
@@ -655,10 +655,10 @@ app.post('/api/admin/reflection', (req, res) => {
 			});
 	});
 });
-// Get reflections sent to user and their responses
+
 app.get('/api/user/:id/reflections', (req, res) => {
 	const userId = req.params.id;
-	// Get latest reflections sent to this user and any response
+	
 	db.query(
 		`SELECT r.id, r.message, r.sent_at, a.fullName as adminName, rr.response, rr.responded_at
 		 FROM reflections r
@@ -674,13 +674,13 @@ app.get('/api/user/:id/reflections', (req, res) => {
 	);
 });
 
-// User: submit reflection response
+
 app.post('/api/user/:userId/reflection/:reflectionId/response', (req, res) => {
 	const userId = req.params.userId;
 	const reflectionId = req.params.reflectionId;
 	const { response } = req.body;
 	if (!response) return res.status(400).json({ error: 'Response required.' });
-	// Only one response per user per reflection: update if exists, else insert
+	
 	db.query(
 		`INSERT INTO reflection_responses (reflection_id, user_id, response, responded_at)
 		 VALUES (?, ?, ?, NOW())
@@ -693,9 +693,9 @@ app.post('/api/user/:userId/reflection/:reflectionId/response', (req, res) => {
 	);
 });
 
-// Admin: get all user reflection responses (for ManageContent)
+
 app.get('/api/admin/reflections/responses', (req, res) => {
-	// Returns all reflections, all user responses, and user info
+	
 	db.query(
 		`SELECT r.id as reflectionId, r.message, r.sent_at, a.fullName as adminName,
 				u.id as userId, u.fullName as userName, rr.response, rr.responded_at
@@ -712,8 +712,8 @@ app.get('/api/admin/reflections/responses', (req, res) => {
 	);
 });
 
-// POST /api/check-account { email, type }
-// Returns { exists: true } if an account for that email exists in users or admins.
+
+
 app.post('/api/check-account', async (req, res) => {
 	const { email, type } = req.body;
 	if (!email) return res.status(400).json({ error: 'Email required' });
@@ -733,15 +733,15 @@ app.post('/api/check-account', async (req, res) => {
 	}
 });
 
-// --- Tenant-portal style convenience endpoints ---
-// User: verify email (sends OTP) -> POST /api/user/forgot-password/verify-email { email }
+
+
 app.post('/api/user/forgot-password/verify-email', async (req, res) => {
-	// Accept either email or username in the request body. If a username is provided,
-	// resolve it to the user's email before storing/sending the OTP.
-	const { email: identifier } = req.body; // identifier may be an email or a username
+	
+	
+	const { email: identifier } = req.body; 
 	if (!identifier) return res.status(400).json({ error: 'Email or username required' });
 	try {
-		// Try to find by email first, then by username
+		
 		const userRows = await new Promise((resolve, reject) => {
 			db.query(
 				'SELECT id, fullName, username, email FROM users WHERE email = ? OR username = ? LIMIT 1',
@@ -752,15 +752,15 @@ app.post('/api/user/forgot-password/verify-email', async (req, res) => {
 		if (!userRows || userRows.length === 0) return res.status(404).json({ error: 'User not found' });
 
 		const user = userRows[0];
-		const email = user.email; // canonical email to use for OTP
+		const email = user.email; 
 
-		// generate and store OTP
+		
 		const otp = Math.floor(100000 + Math.random() * 900000).toString();
 		const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 		await new Promise((resolve, reject) => {
 			db.query('INSERT INTO otps (email, otp_code, expires_at) VALUES (?, ?, ?)', [email, otp, expiresAt], (err, r) => err ? reject(err) : resolve(r));
 		});
-		// send
+		
 		await sendOTPEmail(email, otp);
 		return res.json({ message: 'OTP sent', userDetails: user });
 	} catch (err) {
@@ -772,7 +772,7 @@ app.post('/api/user/forgot-password/verify-email', async (req, res) => {
 	}
 });
 
-// User: verify OTP -> POST /api/user/forgot-password/verify-otp { email, otp }
+
 app.post('/api/user/forgot-password/verify-otp', (req, res) => {
 	const { email, otp } = req.body;
 	if (!email || !otp) return res.status(400).json({ error: 'Email and OTP required' });
@@ -780,17 +780,17 @@ app.post('/api/user/forgot-password/verify-otp', (req, res) => {
 		if (err) return res.status(500).json({ error: 'DB error' });
 		if (!results || results.length === 0) return res.status(400).json({ error: 'Invalid or expired OTP' });
 		db.query('UPDATE otps SET used = 1 WHERE id = ?', [results[0].id]);
-		// optionally return a short-lived token or confirmation
+		
 		return res.json({ message: 'OTP verified' });
 	});
 });
 
-// User: reset password -> POST /api/user/forgot-password/reset-password { email, newPassword }
+
 app.post('/api/user/forgot-password/reset-password', async (req, res) => {
 	const { email, newPassword } = req.body;
 	if (!email || !newPassword) return res.status(400).json({ error: 'Email and newPassword required' });
 	try {
-		// require recently used OTP (used=1 within 15 minutes)
+		
 		const verified = await new Promise((resolve, reject) => {
 			db.query('SELECT id FROM otps WHERE email = ? AND used = 1 AND created_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE) ORDER BY created_at DESC LIMIT 1', [email], (err, results) => err ? reject(err) : resolve(results && results.length > 0));
 		});
@@ -807,10 +807,10 @@ app.post('/api/user/forgot-password/reset-password', async (req, res) => {
 	}
 });
 
-// --- Admin convenience endpoints (follow tenantportal pattern) ---
-// Admin: verify email (send OTP)
+
+
 app.post('/api/admin/forgot-password/verify-email', async (req, res) => {
-	// Accept either email or username for admins as well
+	
 	const { email: identifier } = req.body;
 	if (!identifier) return res.status(400).json({ error: 'Email or username required' });
 	try {
@@ -836,7 +836,7 @@ app.post('/api/admin/forgot-password/verify-email', async (req, res) => {
 	}
 });
 
-// Admin verify OTP
+
 app.post('/api/admin/forgot-password/verify-otp', (req, res) => {
 	const { email, otp } = req.body;
 	if (!email || !otp) return res.status(400).json({ error: 'Email and OTP required' });
@@ -848,7 +848,7 @@ app.post('/api/admin/forgot-password/verify-otp', (req, res) => {
 	});
 });
 
-// Admin reset password
+
 app.post('/api/admin/forgot-password/reset-password', async (req, res) => {
 	const { email, newPassword } = req.body;
 	if (!email || !newPassword) return res.status(400).json({ error: 'Email and newPassword required' });

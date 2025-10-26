@@ -1,10 +1,3 @@
-// Helper to obtain a Gmail OAuth2 refresh token for the mailer.
-// Usage:
-// 1. Add http://localhost:3000/oauth2callback to your OAuth client's Authorized redirect URIs
-// 2. Set GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET in your environment or .env
-// 3. Run: node get_refresh_token.js
-// 4. Complete the consent in the browser and copy the refresh_token value into your env file.
-
 const http = require('http');
 const open = require('open');
 const { google } = require('googleapis');
@@ -12,7 +5,7 @@ require('dotenv').config();
 
 const CLIENT_ID = process.env.GMAIL_CLIENT_ID;
 const CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET;
-const REDIRECT_URI = 'http://localhost:3000/oauth2callback';
+const REDIRECT_URI = 'http:
 const PORT = 3000;
 
 if (!CLIENT_ID || !CLIENT_SECRET) {
@@ -21,7 +14,7 @@ if (!CLIENT_ID || !CLIENT_SECRET) {
 }
 
 const oAuth2Client = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
-const scopes = ['https://www.googleapis.com/auth/gmail.send'];
+const scopes = ['https:
 
 const authUrl = oAuth2Client.generateAuthUrl({
   access_type: 'offline',
@@ -32,7 +25,7 @@ const authUrl = oAuth2Client.generateAuthUrl({
 const server = http.createServer(async (req, res) => {
   if (!req.url.startsWith('/oauth2callback')) return res.end('Invalid endpoint');
 
-  const url = new URL(req.url, `http://localhost:${PORT}`);
+  const url = new URL(req.url, `http:
   const code = url.searchParams.get('code');
   if (!code) {
     res.end('No code in query');
@@ -58,8 +51,8 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Open this URL in your browser to grant access:\n\n${authUrl}\n`);
+  console.log(`Open this URL in your browser to grant access: \n\n${ authUrl }\n`);
   (async () => {
-    try { await open(authUrl); } catch (_) { /* ignore */ }
+    try { await open(authUrl); } catch (_) { }
   })();
 });

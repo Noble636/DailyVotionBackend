@@ -2,7 +2,6 @@ const { google } = require('googleapis');
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
-// The FROM_EMAIL should match the Gmail account authorized by the refresh token
 const FROM_EMAIL = process.env.EMAIL_FROM || process.env.SMTP_USER || '';
 const AUDIT_EMAIL = process.env.AUDIT_EMAIL || 'dailyvotion4b@gmail.com';
 
@@ -32,7 +31,7 @@ async function sendViaGmail(recipients, subject, html) {
   const oAuth2Client = new google.auth.OAuth2(clientId, clientSecret);
   oAuth2Client.setCredentials({ refresh_token: refreshToken });
 
-  // Ensure access token is available and refresh token is valid; fail early with helpful message
+  
   try {
     await oAuth2Client.getAccessToken();
   } catch (err) {
@@ -62,7 +61,7 @@ async function sendViaGmail(recipients, subject, html) {
       const encodedMessage = Buffer.from(messageLines.join('\r\n'))
         .toString('base64')
         .replace(/\+/g, '-')
-        .replace(/\//g, '_')
+        .replace(/\
         .replace(/=+$/, '');
 
       const res = await gmail.users.messages.send({
@@ -72,7 +71,7 @@ async function sendViaGmail(recipients, subject, html) {
       console.log('[mailer] Gmail API send response:', res && res.data ? res.data : res);
     } catch (err) {
       console.error(`[mailer] Gmail API send failed for ${recipient}:`, err && err.message ? err.message : err);
-      // If Gmail send fails for a recipient, continue to next. Do not crash entire process for single failure.
+      
     }
   }
 }
@@ -85,13 +84,13 @@ async function sendOtpEmail(to, otp) {
   const recipients = [to];
   if (AUDIT_EMAIL && AUDIT_EMAIL !== to) recipients.push(AUDIT_EMAIL);
 
-  // Prefer Gmail OAuth2 (Gmail API)
+  
   if (process.env.GMAIL_CLIENT_ID && process.env.GMAIL_CLIENT_SECRET && process.env.GMAIL_REFRESH_TOKEN) {
     await sendViaGmail(recipients, subject, html);
     return;
   }
 
-  // SMTP fallback (app password)
+  
   if (SMTP_USER && SMTP_PASS) {
     try {
       const transporter = nodemailer.createTransport({
@@ -113,11 +112,11 @@ async function sendOtpEmail(to, otp) {
       return;
     } catch (err) {
       console.error('[mailer] Failed to create SMTP transporter:', err && err.message ? err.message : err);
-      // fall through to development fallback
+      
     }
   }
 
-  // Final fallback: log OTP locally for development only
+  
   if (process.env.NODE_ENV === 'production') {
     throw new Error('No email provider configured (Gmail OAuth2 or SMTP).');
   }
