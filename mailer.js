@@ -61,7 +61,7 @@ async function sendViaGmail(recipients, subject, html) {
       const encodedMessage = Buffer.from(messageLines.join('\r\n'))
         .toString('base64')
         .replace(/\+/g, '-')
-        .replace(/\
+        .replace(/\//g, '_')
         .replace(/=+$/, '');
 
       const res = await gmail.users.messages.send({
