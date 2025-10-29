@@ -523,7 +523,10 @@ app.post('/api/admin/prayer/:id/respond', (req, res) => {
 		'UPDATE prayer_requests SET response = ?, status = "responded" WHERE id = ?',
 		[response, prayerId],
 		(err, result) => {
-			if (err) return res.status(500).json({ error: 'Database error' });
+			if (err) {
+				console.error('DB error on prayer respond:', err);
+				return res.status(500).json({ error: 'Database error', details: err.message });
+			}
 			db.query(
 				`SELECT p.id, p.user_id as userId, u.fullName as userName, p.text, p.date, p.status, p.response
 				 FROM prayer_requests p
