@@ -519,47 +519,32 @@ app.post('/api/admin/prayer/:id/respond', (req, res) => {
 	const prayerId = req.params.id;
 	const { response } = req.body;
 	console.log('About to update prayer request:', prayerId, response);
-	db.query(
-		'UPDATE prayer_requests SET response = ?, status = "responded" WHERE id = ?',
-		[response, prayerId],
-		(err, result) => {
-			if (err) {
-				console.error('DB error on prayer respond:', err);
-				return res.status(500).json({ error: 'Database error', details: err.message });
-			}
-            // Check if update affected any rows
-            if (result.affectedRows === 0) {
-                return res.status(404).json({ error: 'Prayer request not found.' });
-            }
-            // Fetch updated prayer for response
-            db.query(
-                `SELECT p.id, p.user_id as userId, u.fullName as userName, p.text, p.date, p.status, p.response
-                 FROM prayer_requests p
-                 LEFT JOIN users u ON p.user_id = u.id
-                 WHERE p.id = ?`,
-                [prayerId],
-                (err2, rows) => {
-                    if (err2) {
-                        console.error('DB error fetching updated prayer:', err2);
-                        return res.status(500).json({ error: 'Database error', details: err2.message });
-                    }
-                    if (!rows || rows.length === 0) {
-                        return res.status(404).json({ error: 'Prayer request not found after update.' });
-                    }
-                    res.json({ prayer: rows[0] });
-                }
-            );
-		}
-	);
-	// Defensive: Only update valid columns
 	const sql = 'UPDATE prayer_requests SET response = ?, status = "responded" WHERE id = ?';
 	db.query(sql, [response, prayerId], (err, result) => {
 		if (err) {
-			console.error('Prayer respond DB error:', err);
-			console.error('SQL attempted:', sql);
-			return res.status(500).json({ error: 'Database error', details: err.sqlMessage });
+			console.error('DB error on prayer respond:', err);
+			return res.status(500).json({ error: 'Database error', details: err.message });
 		}
-		// ...existing code...
+		if (result.affectedRows === 0) {
+			return res.status(404).json({ error: 'Prayer request not found.' });
+		}
+		db.query(
+			`SELECT p.id, p.user_id as userId, u.fullName as userName, p.text, p.date, p.status, p.response
+			 FROM prayer_requests p
+			 LEFT JOIN users u ON p.user_id = u.id
+			 WHERE p.id = ?`,
+			[prayerId],
+			(err2, rows) => {
+				if (err2) {
+					console.error('DB error fetching updated prayer:', err2);
+					return res.status(500).json({ error: 'Database error', details: err2.message });
+				}
+				if (!rows || rows.length === 0) {
+					return res.status(404).json({ error: 'Prayer request not found after update.' });
+				}
+				res.json({ prayer: rows[0] });
+			}
+		);
 	});
 });
 
