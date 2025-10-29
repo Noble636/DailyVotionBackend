@@ -521,6 +521,7 @@ app.post('/api/admin/prayer/:id/respond', (req, res) => {
 	if (!response || typeof response !== 'string' || response.trim() === '') {
         return res.status(400).json({ error: 'Response text required.' });
     }
+	console.log('Updating prayer request:', prayerId, response);
 	db.query(
 		'UPDATE prayer_requests SET response = ?, status = "responded" WHERE id = ?',
 		[response, prayerId],
