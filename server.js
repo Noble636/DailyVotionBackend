@@ -518,10 +518,7 @@ app.get('/api/admin/prayer', (req, res) => {
 app.post('/api/admin/prayer/:id/respond', (req, res) => {
 	const prayerId = req.params.id;
 	const { response } = req.body;
-	if (!response || typeof response !== 'string' || response.trim() === '') {
-        return res.status(400).json({ error: 'Response text required.' });
-    }
-	console.log('Updating prayer request:', prayerId, response);
+	console.log('About to update prayer request:', prayerId, response);
 	db.query(
 		'UPDATE prayer_requests SET response = ?, status = "responded" WHERE id = ?',
 		[response, prayerId],
@@ -749,7 +746,6 @@ app.post('/api/check-account', async (req, res) => {
 		return res.status(500).json({ error: 'Database error' });
 	}
 });
-
 
 
 app.post('/api/user/forgot-password/verify-email', async (req, res) => {
