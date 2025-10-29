@@ -519,7 +519,7 @@ app.post('/api/admin/prayer/:id/respond', (req, res) => {
 	const prayerId = req.params.id;
 	const { response } = req.body;
 	console.log('About to update prayer request:', prayerId, response);
-	const sql = 'UPDATE prayer_requests SET response = ?, status = "responded" WHERE id = ?';
+	const sql = "UPDATE prayer_requests SET response = ?, status = 'responded' WHERE id = ?";
 	db.query(sql, [response, prayerId], (err, result) => {
 		if (err) {
 			console.error('DB error on prayer respond:', err);
