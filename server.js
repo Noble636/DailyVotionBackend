@@ -551,6 +551,16 @@ app.post('/api/admin/prayer/:id/respond', (req, res) => {
             );
 		}
 	);
+	// Defensive: Only update valid columns
+	const sql = 'UPDATE prayer_requests SET response = ?, status = "responded" WHERE id = ?';
+	db.query(sql, [response, prayerId], (err, result) => {
+		if (err) {
+			console.error('Prayer respond DB error:', err);
+			console.error('SQL attempted:', sql);
+			return res.status(500).json({ error: 'Database error', details: err.sqlMessage });
+		}
+		// ...existing code...
+	});
 });
 
 app.post('/api/user/:id/feedback', (req, res) => {
