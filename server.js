@@ -1,3 +1,20 @@
+// Serve profilePic BLOB as base64 image
+app.get('/api/user/:id/profile-pic', (req, res) => {
+	const userId = req.params.id;
+	db.query('SELECT profilePic FROM users WHERE id = ?', [userId], (err, results) => {
+		if (err) return res.status(500).json({ error: 'Database error' });
+		if (!results.length || !results[0].profilePic) {
+			return res.status(404).json({ error: 'No profile picture found' });
+		}
+		const imgBuffer = results[0].profilePic;
+		// Detect image type (default to jpeg)
+		let mimeType = 'image/jpeg';
+		// Optionally, you can store mimeType in DB for more accuracy
+		// For now, just use jpeg
+		const base64Img = imgBuffer.toString('base64');
+		res.json({ base64: `data:${mimeType};base64,${base64Img}` });
+	});
+});
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -183,25 +200,33 @@ app.put('/api/user/:id', upload.single('profilePic'), async (req, res) => {
 		const hashedPassword = await bcrypt.hash(password, 10);
 		updateFields.push('password = ?'); updateValues.push(hashedPassword);
 	}
+	// Accept profilePic as file upload or base64 string
+	let profilePicBuffer = null;
 	if (req.file) {
-		const profilePicPath = '/uploads/' + req.file.filename;
-		updateFields.push('profilePic = ?'); updateValues.push(profilePicPath);
+		profilePicBuffer = fs.readFileSync(req.file.path);
+	} else if (req.body.profilePic && typeof req.body.profilePic === 'string' && req.body.profilePic.startsWith('data:image')) {
+		// If sent as base64 string
+		const base64Data = req.body.profilePic.split(',')[1];
+		profilePicBuffer = Buffer.from(base64Data, 'base64');
+	}
+	if (profilePicBuffer) {
+		updateFields.push('profilePic = ?');
+		updateValues.push(profilePicBuffer);
 	}
 	if (updateFields.length === 0) return res.status(400).json({ error: 'No fields to update' });
 	updateValues.push(userId);
-		db.query(`UPDATE users SET ${updateFields.join(', ')} WHERE id = ?`, updateValues, (err, result) => {
-			if (err) {
-				if (err.code === 'ER_DUP_ENTRY') {
-					return res.status(400).json({ error: 'Email or username already exists' });
-				}
-				return res.status(500).json({ error: 'Database error' });
+	db.query(`UPDATE users SET ${updateFields.join(', ')} WHERE id = ?`, updateValues, (err, result) => {
+		if (err) {
+			if (err.code === 'ER_DUP_ENTRY') {
+				return res.status(400).json({ error: 'Email or username already exists' });
 			}
-			
-			db.query('SELECT profilePic FROM users WHERE id = ?', [userId], (err2, rows) => {
-				if (err2) return res.status(500).json({ error: 'Database error' });
-				res.json({ message: 'Profile updated!', profilePic: rows[0]?.profilePic });
-			});
+			return res.status(500).json({ error: 'Database error' });
+		}
+		db.query('SELECT profilePic FROM users WHERE id = ?', [userId], (err2, rows) => {
+			if (err2) return res.status(500).json({ error: 'Database error' });
+			res.json({ message: 'Profile updated!', hasProfilePic: !!rows[0]?.profilePic });
 		});
+	});
 });
 
 

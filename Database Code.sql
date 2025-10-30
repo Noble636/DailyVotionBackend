@@ -21,9 +21,10 @@ CREATE TABLE users (
     email VARCHAR(100) NOT NULL UNIQUE,
     mobile VARCHAR(20),
     password VARCHAR(255) NOT NULL,
-    profilePic VARCHAR(255),
+    profilePic LONGBLOB,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
 
 CREATE TABLE journals (
     id INT AUTO_INCREMENT PRIMARY KEY,
