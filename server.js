@@ -1,20 +1,3 @@
-// Serve profilePic BLOB as base64 image
-app.get('/api/user/:id/profile-pic', (req, res) => {
-	const userId = req.params.id;
-	db.query('SELECT profilePic FROM users WHERE id = ?', [userId], (err, results) => {
-		if (err) return res.status(500).json({ error: 'Database error' });
-		if (!results.length || !results[0].profilePic) {
-			return res.status(404).json({ error: 'No profile picture found' });
-		}
-		const imgBuffer = results[0].profilePic;
-		// Detect image type (default to jpeg)
-		let mimeType = 'image/jpeg';
-		// Optionally, you can store mimeType in DB for more accuracy
-		// For now, just use jpeg
-		const base64Img = imgBuffer.toString('base64');
-		res.json({ base64: `data:${mimeType};base64,${base64Img}` });
-	});
-});
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -900,4 +883,22 @@ app.post('/api/admin/forgot-password/reset-password', async (req, res) => {
 		console.error('admin reset-password failed:', err && err.message ? err.message : err);
 		return res.status(500).json({ error: 'Failed to reset password' });
 	}
+});
+
+// Serve profilePic BLOB as base64 image
+app.get('/api/user/:id/profile-pic', (req, res) => {
+	const userId = req.params.id;
+	db.query('SELECT profilePic FROM users WHERE id = ?', [userId], (err, results) => {
+		if (err) return res.status(500).json({ error: 'Database error' });
+		if (!results.length || !results[0].profilePic) {
+			return res.status(404).json({ error: 'No profile picture found' });
+		}
+		const imgBuffer = results[0].profilePic;
+		// Detect image type (default to jpeg)
+		let mimeType = 'image/jpeg';
+		// Optionally, you can store mimeType in DB for more accuracy
+		// For now, just use jpeg
+		const base64Img = imgBuffer.toString('base64');
+		res.json({ base64: `data:${mimeType};base64,${base64Img}` });
+	});
 });
