@@ -958,26 +958,47 @@ app.get('/api/gallery/image/:imageId', (req, res) => {
 
 // --- Bible Reading Guide Images Endpoints ---
 // Upload image for a month
+// Upload Bible Reading Guide image (no month)
 app.post('/api/admin/bible-guide/image', upload.single('image'), (req, res) => {
-	const { month, imageName, adminId } = req.body;
+	const { imageName, adminId } = req.body;
 	let mimeType = req.file && req.file.mimetype ? req.file.mimetype : 'image/jpeg';
-	if (!month || !req.file || !adminId) return res.status(400).json({ error: 'Month, image, and adminId required.' });
+	if (!req.file || !adminId) return res.status(400).json({ error: 'Image and adminId required.' });
 	const imageBuffer = fs.readFileSync(req.file.path);
 	const filename = req.file.filename;
-	db.query('INSERT INTO bible_reading_guide_images (month, image_name, image_blob, mime_type, uploaded_by, filename) VALUES (?, ?, ?, ?, ?, ?)',
-		[month, imageName || req.file.originalname, imageBuffer, mimeType, adminId, filename],
+	db.query('INSERT INTO bible_reading_guide_images (image_name, image_blob, mime_type, uploaded_by, filename) VALUES (?, ?, ?, ?, ?)',
+		[imageName || req.file.originalname, imageBuffer, mimeType, adminId, filename],
 		(err, result) => {
 			if (err) return res.status(500).json({ error: 'Database error' });
 			res.json({ imageId: result.insertId });
 		});
 });
 
-// List images for a month
-app.get('/api/bible-guide/images/:month', (req, res) => {
-	const month = req.params.month;
-	db.query('SELECT id, image_name, mime_type, uploaded_at, filename FROM bible_reading_guide_images WHERE month = ? ORDER BY uploaded_at DESC', [month], (err, results) => {
+// List all Bible Reading Guide images
+app.get('/api/bible-guide/images', (req, res) => {
+	db.query('SELECT id, image_name, mime_type, uploaded_at, filename FROM bible_reading_guide_images ORDER BY uploaded_at DESC', [], (err, results) => {
 		if (err) return res.status(500).json({ error: 'Database error' });
 		res.json(results);
+	});
+});
+// Delete Bible Reading Guide image
+app.delete('/api/admin/bible-guide/image/:imageId', (req, res) => {
+	const imageId = req.params.imageId;
+	db.query('DELETE FROM bible_reading_guide_images WHERE id = ?', [imageId], (err, result) => {
+		if (err) return res.status(500).json({ error: 'Database error' });
+		if (result.affectedRows === 0) return res.status(404).json({ error: 'Image not found.' });
+		res.json({ message: 'Image deleted.' });
+	});
+});
+
+// Rename Bible Reading Guide image
+app.put('/api/admin/bible-guide/image/:imageId', (req, res) => {
+	const imageId = req.params.imageId;
+	const { imageName } = req.body;
+	if (!imageName) return res.status(400).json({ error: 'Image name required.' });
+	db.query('UPDATE bible_reading_guide_images SET image_name = ? WHERE id = ?', [imageName, imageId], (err, result) => {
+		if (err) return res.status(500).json({ error: 'Database error' });
+		if (result.affectedRows === 0) return res.status(404).json({ error: 'Image not found.' });
+		res.json({ message: 'Image name updated.' });
 	});
 });
 

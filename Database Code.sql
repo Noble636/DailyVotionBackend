@@ -112,7 +112,6 @@ CREATE TABLE gallery_images (
 -- Bible Reading Guide Images
 CREATE TABLE bible_reading_guide_images (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    month VARCHAR(20) NOT NULL,
     image_name VARCHAR(100),
     image_blob LONGBLOB NOT NULL,
     mime_type VARCHAR(32) DEFAULT 'image/jpeg',
