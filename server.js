@@ -887,15 +887,28 @@ app.post('/api/admin/forgot-password/reset-password', async (req, res) => {
 
 app.get('/api/user/:id/profile-pic', (req, res) => {
 	const userId = req.params.id;
-	db.query('SELECT profilePic, profilePicFilename FROM users WHERE id = ?', [userId], (err, results) => {
-		if (err) return res.status(500).json({ error: 'Database error' });
-		if (!results.length || !results[0].profilePic) {
-			return res.status(404).json({ error: 'No profile picture found' });
+	db.query('SELECT profilePic FROM users WHERE id = ?', [userId], (err, results) => {
+		if (err) {
+			console.error('DB error fetching profilePic:', err);
+			return res.status(500).json({ error: 'Database error' });
+		}
+		if (!results.length) {
+			console.warn('No user found for profile pic:', userId);
+			return res.status(404).json({ error: 'User not found' });
 		}
 		const imgBuffer = results[0].profilePic;
+		if (!imgBuffer || !(Buffer.isBuffer(imgBuffer)) || imgBuffer.length === 0) {
+			console.warn('No valid profilePic buffer for user:', userId, 'Value:', imgBuffer);
+			return res.status(404).json({ error: 'No profile picture found' });
+		}
 		let mimeType = 'image/jpeg';
-		const base64Img = imgBuffer.toString('base64');
-		res.json({ base64: `data:${mimeType};base64,${base64Img}` });
+		try {
+			const base64Img = imgBuffer.toString('base64');
+			res.json({ base64: `data:${mimeType};base64,${base64Img}` });
+		} catch (e) {
+			console.error('Error converting profilePic to base64 for user:', userId, e);
+			return res.status(500).json({ error: 'Failed to process profile picture' });
+		}
 	});
 });
 
