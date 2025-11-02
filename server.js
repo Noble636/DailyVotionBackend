@@ -934,7 +934,7 @@ app.get('/api/gallery/albums', (req, res) => {
 });
 
 // List images in album
-app.get('https://dailyvotionbackend-91wt.onrender.com/api/gallery/album/:albumId/images', (req, res) => {
+app.get('/api/gallery/album/:albumId/images', (req, res) => {
 	const albumId = req.params.albumId;
 	db.query('SELECT id, image_name, mime_type, uploaded_at, filename FROM gallery_images WHERE album_id = ? ORDER BY uploaded_at DESC', [albumId], (err, results) => {
 		if (err) return res.status(500).json({ error: 'Database error' });
@@ -943,7 +943,7 @@ app.get('https://dailyvotionbackend-91wt.onrender.com/api/gallery/album/:albumId
 });
 
 // Get image as base64
-app.get('https://dailyvotionbackend-91wt.onrender.com/api/gallery/image/:imageId', (req, res) => {
+app.get('/api/gallery/image/:imageId', (req, res) => {
 	const imageId = req.params.imageId;
 	db.query('SELECT image_blob, mime_type FROM gallery_images WHERE id = ?', [imageId], (err, results) => {
 		if (err) return res.status(500).json({ error: 'Database error' });
@@ -957,7 +957,7 @@ app.get('https://dailyvotionbackend-91wt.onrender.com/api/gallery/image/:imageId
 
 // --- Bible Reading Guide Images Endpoints ---
 // Upload image for a month
-app.post('https://dailyvotionbackend-91wt.onrender.com/api/admin/bible-guide/image', upload.single('image'), (req, res) => {
+app.post('/api/admin/bible-guide/image', upload.single('image'), (req, res) => {
 	const { month, imageName, adminId } = req.body;
 	let mimeType = req.file && req.file.mimetype ? req.file.mimetype : 'image/jpeg';
 	if (!month || !req.file || !adminId) return res.status(400).json({ error: 'Month, image, and adminId required.' });
@@ -971,7 +971,7 @@ app.post('https://dailyvotionbackend-91wt.onrender.com/api/admin/bible-guide/ima
 });
 
 // List images for a month
-app.get('https://dailyvotionbackend-91wt.onrender.com/api/bible-guide/images/:month', (req, res) => {
+app.get('/api/bible-guide/images/:month', (req, res) => {
 	const month = req.params.month;
 	db.query('SELECT id, image_name, mime_type, uploaded_at, filename FROM bible_reading_guide_images WHERE month = ? ORDER BY uploaded_at DESC', [month], (err, results) => {
 		if (err) return res.status(500).json({ error: 'Database error' });
