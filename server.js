@@ -979,7 +979,6 @@ app.get('/api/bible-guide/images', (req, res) => {
 		if (err) return res.status(500).json({ error: 'Database error' });
 		res.json(results);
 	});
-});
 // Delete Bible Reading Guide image
 app.delete('/api/admin/bible-guide/image/:imageId', (req, res) => {
 	const imageId = req.params.imageId;
