@@ -980,7 +980,7 @@ app.get('/api/bible-guide/images/:month', (req, res) => {
 });
 
 // Get bible guide image as base64
-app.get('https://dailyvotionbackend-91wt.onrender.com/api/bible-guide/image/:imageId', (req, res) => {
+app.get('/api/bible-guide/image/:imageId', (req, res) => {
 	const imageId = req.params.imageId;
 	db.query('SELECT image_blob, mime_type FROM bible_reading_guide_images WHERE id = ?', [imageId], (err, results) => {
 		if (err) return res.status(500).json({ error: 'Database error' });
