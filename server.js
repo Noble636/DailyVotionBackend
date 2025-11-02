@@ -1,3 +1,95 @@
+// --- Gallery Albums & Images Endpoints ---
+// Create new album
+app.post('/api/admin/gallery/album', (req, res) => {
+	const { name, adminId } = req.body;
+	if (!name || !adminId) return res.status(400).json({ error: 'Album name and adminId required.' });
+	db.query('INSERT INTO gallery_albums (name, created_by) VALUES (?, ?)', [name, adminId], (err, result) => {
+		if (err) return res.status(500).json({ error: 'Database error' });
+		res.json({ albumId: result.insertId });
+	});
+});
+
+// Upload image to album
+app.post('/api/admin/gallery/album/:albumId/image', upload.single('image'), (req, res) => {
+	const albumId = req.params.albumId;
+	const { imageName, adminId } = req.body;
+	let mimeType = req.file && req.file.mimetype ? req.file.mimetype : 'image/jpeg';
+	if (!req.file) return res.status(400).json({ error: 'Image file required.' });
+	const imageBuffer = fs.readFileSync(req.file.path);
+	db.query('INSERT INTO gallery_images (album_id, image_name, image_blob, mime_type, uploaded_by) VALUES (?, ?, ?, ?, ?)',
+		[albumId, imageName || req.file.originalname, imageBuffer, mimeType, adminId],
+		(err, result) => {
+			if (err) return res.status(500).json({ error: 'Database error' });
+			res.json({ imageId: result.insertId });
+		});
+});
+
+// List albums
+app.get('/api/gallery/albums', (req, res) => {
+	db.query('SELECT id, name, created_at FROM gallery_albums ORDER BY created_at DESC', [], (err, results) => {
+		if (err) return res.status(500).json({ error: 'Database error' });
+		res.json(results);
+	});
+});
+
+// List images in album
+app.get('/api/gallery/album/:albumId/images', (req, res) => {
+	const albumId = req.params.albumId;
+	db.query('SELECT id, image_name, mime_type, uploaded_at FROM gallery_images WHERE album_id = ? ORDER BY uploaded_at DESC', [albumId], (err, results) => {
+		if (err) return res.status(500).json({ error: 'Database error' });
+		res.json(results);
+	});
+});
+
+// Get image as base64
+app.get('/api/gallery/image/:imageId', (req, res) => {
+	const imageId = req.params.imageId;
+	db.query('SELECT image_blob, mime_type FROM gallery_images WHERE id = ?', [imageId], (err, results) => {
+		if (err) return res.status(500).json({ error: 'Database error' });
+		if (!results.length) return res.status(404).json({ error: 'Image not found' });
+		const imgBuffer = results[0].image_blob;
+		const mimeType = results[0].mime_type || 'image/jpeg';
+		const base64Img = imgBuffer.toString('base64');
+		res.json({ base64: `data:${mimeType};base64,${base64Img}` });
+	});
+});
+
+// --- Bible Reading Guide Images Endpoints ---
+// Upload image for a month
+app.post('/api/admin/bible-guide/image', upload.single('image'), (req, res) => {
+	const { month, imageName, adminId } = req.body;
+	let mimeType = req.file && req.file.mimetype ? req.file.mimetype : 'image/jpeg';
+	if (!month || !req.file || !adminId) return res.status(400).json({ error: 'Month, image, and adminId required.' });
+	const imageBuffer = fs.readFileSync(req.file.path);
+	db.query('INSERT INTO bible_reading_guide_images (month, image_name, image_blob, mime_type, uploaded_by) VALUES (?, ?, ?, ?, ?)',
+		[month, imageName || req.file.originalname, imageBuffer, mimeType, adminId],
+		(err, result) => {
+			if (err) return res.status(500).json({ error: 'Database error' });
+			res.json({ imageId: result.insertId });
+		});
+});
+
+// List images for a month
+app.get('/api/bible-guide/images/:month', (req, res) => {
+	const month = req.params.month;
+	db.query('SELECT id, image_name, mime_type, uploaded_at FROM bible_reading_guide_images WHERE month = ? ORDER BY uploaded_at DESC', [month], (err, results) => {
+		if (err) return res.status(500).json({ error: 'Database error' });
+		res.json(results);
+	});
+});
+
+// Get bible guide image as base64
+app.get('/api/bible-guide/image/:imageId', (req, res) => {
+	const imageId = req.params.imageId;
+	db.query('SELECT image_blob, mime_type FROM bible_reading_guide_images WHERE id = ?', [imageId], (err, results) => {
+		if (err) return res.status(500).json({ error: 'Database error' });
+		if (!results.length) return res.status(404).json({ error: 'Image not found' });
+		const imgBuffer = results[0].image_blob;
+		const mimeType = results[0].mime_type || 'image/jpeg';
+		const base64Img = imgBuffer.toString('base64');
+		res.json({ base64: `data:${mimeType};base64,${base64Img}` });
+	});
+});
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -885,7 +977,6 @@ app.post('/api/admin/forgot-password/reset-password', async (req, res) => {
 	}
 });
 
-// Serve profilePic BLOB as base64 image
 app.get('/api/user/:id/profile-pic', (req, res) => {
 	const userId = req.params.id;
 	db.query('SELECT profilePic FROM users WHERE id = ?', [userId], (err, results) => {
@@ -894,10 +985,7 @@ app.get('/api/user/:id/profile-pic', (req, res) => {
 			return res.status(404).json({ error: 'No profile picture found' });
 		}
 		const imgBuffer = results[0].profilePic;
-		// Detect image type (default to jpeg)
 		let mimeType = 'image/jpeg';
-		// Optionally, you can store mimeType in DB for more accuracy
-		// For now, just use jpeg
 		const base64Img = imgBuffer.toString('base64');
 		res.json({ base64: `data:${mimeType};base64,${base64Img}` });
 	});
