@@ -887,7 +887,7 @@ app.post('/api/admin/forgot-password/reset-password', async (req, res) => {
 
 app.get('/api/user/:id/profile-pic', (req, res) => {
 	const userId = req.params.id;
-	db.query('SELECT profilePic FROM users WHERE id = ?', [userId], (err, results) => {
+	db.query('SELECT profilePic, profilePicFilename FROM users WHERE id = ?', [userId], (err, results) => {
 		if (err) return res.status(500).json({ error: 'Database error' });
 		if (!results.length || !results[0].profilePic) {
 			return res.status(404).json({ error: 'No profile picture found' });
@@ -934,16 +934,16 @@ app.get('/api/gallery/albums', (req, res) => {
 });
 
 // List images in album
-app.get('/api/gallery/album/:albumId/images', (req, res) => {
+app.get('https://dailyvotionbackend-91wt.onrender.com/api/gallery/album/:albumId/images', (req, res) => {
 	const albumId = req.params.albumId;
-	db.query('SELECT id, image_name, mime_type, uploaded_at FROM gallery_images WHERE album_id = ? ORDER BY uploaded_at DESC', [albumId], (err, results) => {
+	db.query('SELECT id, image_name, mime_type, uploaded_at, filename FROM gallery_images WHERE album_id = ? ORDER BY uploaded_at DESC', [albumId], (err, results) => {
 		if (err) return res.status(500).json({ error: 'Database error' });
 		res.json(results);
 	});
 });
 
 // Get image as base64
-app.get('/api/gallery/image/:imageId', (req, res) => {
+app.get('https://dailyvotionbackend-91wt.onrender.com/api/gallery/image/:imageId', (req, res) => {
 	const imageId = req.params.imageId;
 	db.query('SELECT image_blob, mime_type FROM gallery_images WHERE id = ?', [imageId], (err, results) => {
 		if (err) return res.status(500).json({ error: 'Database error' });
@@ -957,7 +957,7 @@ app.get('/api/gallery/image/:imageId', (req, res) => {
 
 // --- Bible Reading Guide Images Endpoints ---
 // Upload image for a month
-app.post('/api/admin/bible-guide/image', upload.single('image'), (req, res) => {
+app.post('https://dailyvotionbackend-91wt.onrender.com/api/admin/bible-guide/image', upload.single('image'), (req, res) => {
 	const { month, imageName, adminId } = req.body;
 	let mimeType = req.file && req.file.mimetype ? req.file.mimetype : 'image/jpeg';
 	if (!month || !req.file || !adminId) return res.status(400).json({ error: 'Month, image, and adminId required.' });
@@ -971,16 +971,16 @@ app.post('/api/admin/bible-guide/image', upload.single('image'), (req, res) => {
 });
 
 // List images for a month
-app.get('/api/bible-guide/images/:month', (req, res) => {
+app.get('https://dailyvotionbackend-91wt.onrender.com/api/bible-guide/images/:month', (req, res) => {
 	const month = req.params.month;
-	db.query('SELECT id, image_name, mime_type, uploaded_at FROM bible_reading_guide_images WHERE month = ? ORDER BY uploaded_at DESC', [month], (err, results) => {
+	db.query('SELECT id, image_name, mime_type, uploaded_at, filename FROM bible_reading_guide_images WHERE month = ? ORDER BY uploaded_at DESC', [month], (err, results) => {
 		if (err) return res.status(500).json({ error: 'Database error' });
 		res.json(results);
 	});
 });
 
 // Get bible guide image as base64
-app.get('/api/bible-guide/image/:imageId', (req, res) => {
+app.get('https://dailyvotionbackend-91wt.onrender.com/api/bible-guide/image/:imageId', (req, res) => {
 	const imageId = req.params.imageId;
 	db.query('SELECT image_blob, mime_type FROM bible_reading_guide_images WHERE id = ?', [imageId], (err, results) => {
 		if (err) return res.status(500).json({ error: 'Database error' });
