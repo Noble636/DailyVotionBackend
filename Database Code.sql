@@ -1,36 +1,3 @@
--- Gallery Albums
-CREATE TABLE gallery_albums (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    created_by INT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (created_by) REFERENCES admins(id) ON DELETE SET NULL
-);
-
--- Gallery Images
-CREATE TABLE gallery_images (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    album_id INT NOT NULL,
-    image_name VARCHAR(100),
-    image_blob LONGBLOB NOT NULL,
-    mime_type VARCHAR(32) DEFAULT 'image/jpeg',
-    uploaded_by INT,
-    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (album_id) REFERENCES gallery_albums(id) ON DELETE CASCADE,
-    FOREIGN KEY (uploaded_by) REFERENCES admins(id) ON DELETE SET NULL
-);
-
--- Bible Reading Guide Images
-CREATE TABLE bible_reading_guide_images (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    month VARCHAR(20) NOT NULL,
-    image_name VARCHAR(100),
-    image_blob LONGBLOB NOT NULL,
-    mime_type VARCHAR(32) DEFAULT 'image/jpeg',
-    uploaded_by INT,
-    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (uploaded_by) REFERENCES admins(id) ON DELETE SET NULL
-);
 DROP DATABASE IF EXISTS defaultdb;
 CREATE DATABASE defaultdb;
 USE defaultdb;
@@ -117,4 +84,40 @@ CREATE TABLE otps (
     expires_at DATETIME NOT NULL,
     used TINYINT(1) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Gallery Albums
+CREATE TABLE gallery_albums (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    created_by INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES admins(id) ON DELETE SET NULL
+);
+
+-- Gallery Images
+CREATE TABLE gallery_images (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    album_id INT NOT NULL,
+    image_name VARCHAR(100),
+    image_blob LONGBLOB NOT NULL,
+    mime_type VARCHAR(32) DEFAULT 'image/jpeg',
+    uploaded_by INT,
+    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    filename VARCHAR(255),
+    FOREIGN KEY (album_id) REFERENCES gallery_albums(id) ON DELETE CASCADE,
+    FOREIGN KEY (uploaded_by) REFERENCES admins(id) ON DELETE SET NULL
+);
+
+-- Bible Reading Guide Images
+CREATE TABLE bible_reading_guide_images (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    month VARCHAR(20) NOT NULL,
+    image_name VARCHAR(100),
+    image_blob LONGBLOB NOT NULL,
+    mime_type VARCHAR(32) DEFAULT 'image/jpeg',
+    uploaded_by INT,
+    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    filename VARCHAR(255),
+    FOREIGN KEY (uploaded_by) REFERENCES admins(id) ON DELETE SET NULL
 );

@@ -917,8 +917,9 @@ app.post('/api/admin/gallery/album/:albumId/image', upload.single('image'), (req
 	let mimeType = req.file && req.file.mimetype ? req.file.mimetype : 'image/jpeg';
 	if (!req.file) return res.status(400).json({ error: 'Image file required.' });
 	const imageBuffer = fs.readFileSync(req.file.path);
-	db.query('INSERT INTO gallery_images (album_id, image_name, image_blob, mime_type, uploaded_by) VALUES (?, ?, ?, ?, ?)',
-		[albumId, imageName || req.file.originalname, imageBuffer, mimeType, adminId],
+	const filename = req.file.filename;
+	db.query('INSERT INTO gallery_images (album_id, image_name, image_blob, mime_type, uploaded_by, filename) VALUES (?, ?, ?, ?, ?, ?)',
+		[albumId, imageName || req.file.originalname, imageBuffer, mimeType, adminId, filename],
 		(err, result) => {
 			if (err) return res.status(500).json({ error: 'Database error' });
 			res.json({ imageId: result.insertId });
@@ -962,8 +963,9 @@ app.post('/api/admin/bible-guide/image', upload.single('image'), (req, res) => {
 	let mimeType = req.file && req.file.mimetype ? req.file.mimetype : 'image/jpeg';
 	if (!month || !req.file || !adminId) return res.status(400).json({ error: 'Month, image, and adminId required.' });
 	const imageBuffer = fs.readFileSync(req.file.path);
-	db.query('INSERT INTO bible_reading_guide_images (month, image_name, image_blob, mime_type, uploaded_by) VALUES (?, ?, ?, ?, ?)',
-		[month, imageName || req.file.originalname, imageBuffer, mimeType, adminId],
+	const filename = req.file.filename;
+	db.query('INSERT INTO bible_reading_guide_images (month, image_name, image_blob, mime_type, uploaded_by, filename) VALUES (?, ?, ?, ?, ?, ?)',
+		[month, imageName || req.file.originalname, imageBuffer, mimeType, adminId, filename],
 		(err, result) => {
 			if (err) return res.status(500).json({ error: 'Database error' });
 			res.json({ imageId: result.insertId });
@@ -989,5 +991,19 @@ app.get('/api/bible-guide/image/:imageId', (req, res) => {
 		const mimeType = results[0].mime_type || 'image/jpeg';
 		const base64Img = imgBuffer.toString('base64');
 		res.json({ base64: `data:${mimeType};base64,${base64Img}` });
+	});
+});
+
+// Delete gallery album and all its images
+app.delete('/api/admin/gallery/album/:albumId', (req, res) => {
+	const albumId = req.params.albumId;
+	// Optionally check adminId from req.body for authorization
+	db.query('DELETE FROM gallery_images WHERE album_id = ?', [albumId], (err1) => {
+		if (err1) return res.status(500).json({ error: 'Failed to delete album images.' });
+		db.query('DELETE FROM gallery_albums WHERE id = ?', [albumId], (err2, result) => {
+			if (err2) return res.status(500).json({ error: 'Failed to delete album.' });
+			if (result.affectedRows === 0) return res.status(404).json({ error: 'Album not found.' });
+			res.json({ message: 'Album and all images deleted.' });
+		});
 	});
 });
