@@ -4,7 +4,6 @@ require('dotenv').config();
 
 const FROM_EMAIL = process.env.EMAIL_FROM || process.env.SMTP_USER || '';
 const AUDIT_EMAIL = process.env.AUDIT_EMAIL || 'dailyvotion4b@gmail.com';
-
 const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
 
