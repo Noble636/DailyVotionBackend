@@ -627,33 +627,6 @@ app.get('/api/user/:id/journal', (req, res) => {
 });
 
 
-// Update a user's journal entry by journal id
-app.put('/api/user/:userId/journal/:journalId', (req, res) => {
-    const userId = req.params.userId;
-    const journalId = req.params.journalId;
-    const { date, scripture, observation, application, prayer } = req.body;
-    if (!date || !scripture) {
-        return res.status(400).json({ error: 'Date and scripture are required.' });
-    }
-    const sql = `
-        UPDATE journals
-        SET date = ?, scripture = ?, observation = ?, application = ?, prayer = ?
-        WHERE id = ? AND user_id = ?
-    `;
-    const values = [date, scripture, observation, application, prayer, journalId, userId];
-    db.query(sql, values, (err, result) => {
-        if (err) {
-            console.error('Error updating journal:', err);
-            return res.status(500).json({ error: 'Failed to update journal entry.' });
-        }
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ error: 'Journal entry not found or not owned by user.' });
-        }
-        res.json({ message: 'Journal entry updated!' });
-    });
-});
-
-
 app.post('/api/admin/reflection', (req, res) => {
 	const { adminId, message, userIds } = req.body;
 	if (!adminId || !message || !Array.isArray(userIds) || userIds.length === 0) {
